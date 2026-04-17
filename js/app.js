@@ -1,7 +1,8 @@
 // State Management
 const state = {
     blocks: [],
-    selectedBlockId: null
+    selectedBlockId: null,
+    deviceView: 'desktop'
 };
 
 // Available Block Definitions
@@ -23,6 +24,30 @@ const BLOCK_TYPES = [
         name: 'Scroll: Pinned Image',
         icon: 'fa-film',
         description: 'Image pins while text scrolls'
+    },
+    {
+        id: 'button',
+        name: 'Button',
+        icon: 'fa-square-up-right',
+        description: 'Customizable link button'
+    },
+    {
+        id: 'grid-2',
+        name: '2-Image Grid',
+        icon: 'fa-table-columns',
+        description: 'Two images side-by-side'
+    },
+    {
+        id: 'grid-4',
+        name: '4-Image Grid',
+        icon: 'fa-border-all',
+        description: 'Four images in a 2x2 grid'
+    },
+    {
+        id: 'freeform',
+        name: 'Freeform Media',
+        icon: 'fa-vector-square',
+        description: 'Drag & drop image/video anywhere'
     }
 ];
 
@@ -38,6 +63,65 @@ function init() {
     renderPalette();
     renderCanvas();
     setupEventListeners();
+    initInteractJS();
+}
+
+function initInteractJS() {
+    if (typeof interact === 'undefined') return; // Safety check
+    
+    interact('.freeform-item')
+        .draggable({
+            modifiers: [
+                interact.modifiers.restrictRect({
+                    restriction: 'parent',
+                    endOnly: false
+                })
+            ],
+            listeners: {
+                start(event) {
+                    const id = event.target.dataset.id;
+                    if (state.selectedBlockId !== id) {
+                        selectBlock(id);
+                    }
+                },
+                move(event) {
+                    const target = event.target;
+                    const id = target.dataset.id;
+                    const block = state.blocks.find(b => b.id === id);
+                    if (!block) return;
+                    
+                    block.content.x += event.dx;
+                    block.content.y += event.dy;
+                    
+                    target.style.transform = `translate(${block.content.x}px, ${block.content.y}px)`;
+                }
+            }
+        })
+        .resizable({
+            edges: { left: '.resize-tl, .resize-bl', right: '.resize-tr, .resize-br', bottom: '.resize-bl, .resize-br', top: '.resize-tl, .resize-tr' },
+            modifiers: [
+                interact.modifiers.restrictEdges({
+                    outer: 'parent'
+                })
+            ],
+            listeners: {
+                move(event) {
+                    const target = event.target;
+                    const id = target.dataset.id;
+                    const block = state.blocks.find(b => b.id === id);
+                    if (!block) return;
+
+                    block.content.x += event.deltaRect.left;
+                    block.content.y += event.deltaRect.top;
+                    block.content.width = event.rect.width;
+                    block.content.height = event.rect.height;
+
+                    target.style.width = `${block.content.width}px`;
+                    target.style.height = `${block.content.height}px`;
+                    target.style.transform = `translate(${block.content.x}px, ${block.content.y}px)`;
+                }
+            }
+        });
 }
 
 function renderPalette() {
@@ -159,6 +243,55 @@ function renderBlockContent(block) {
                 </div>
             </div>
         `;
+    } else if (block.type === 'button') {
+        return `
+            <div style="padding: 40px; text-align: center;">
+                <a href="${block.content.link}" class="btn-block-btn btn-shape-${block.content.shape}" style="background-color: ${block.content.color}; color: ${block.content.textColor};">
+                    ${block.content.text}
+                </a>
+            </div>
+        `;
+    } else if (block.type === 'grid-2') {
+        return `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 40px; max-width: 1200px; margin: 0 auto;">
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image1}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image2}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+            </div>
+        `;
+    } else if (block.type === 'grid-4') {
+        return `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 40px; max-width: 1200px; margin: 0 auto;">
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image1}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image2}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image3}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image4}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
+            </div>
+        `;
+    } else if (block.type === 'freeform') {
+        let mediaHtml = '';
+        if (block.content.mediaType === 'image') {
+            mediaHtml = `<img src="${block.content.src}" class="media-content" style="object-fit: ${block.content.objectFit};">`;
+        } else if (block.content.mediaType === 'video') {
+            mediaHtml = `<video src="${block.content.src}" class="media-content" style="object-fit: ${block.content.objectFit};" autoplay loop muted playsinline></video>`;
+        } else if (block.content.mediaType === 'youtube') {
+            mediaHtml = `<iframe src="https://www.youtube.com/embed/${block.content.src}?autoplay=1&mute=1&loop=1&controls=0" class="media-content" frameborder="0" allow="autoplay; fullscreen" style="object-fit: ${block.content.objectFit}; pointer-events:none;"></iframe>`;
+        }
+        
+        return `
+            <div class="freeform-container">
+                <div class="freeform-item ${block.id === state.selectedBlockId ? 'selected' : ''}" 
+                     data-id="${block.id}"
+                     style="transform: translate(${block.content.x}px, ${block.content.y}px); width: ${block.content.width}px; height: ${block.content.height}px; z-index: ${block.content.zIndex};">
+                    
+                    ${mediaHtml}
+                    
+                    <div class="resize-handle resize-tl"></div>
+                    <div class="resize-handle resize-tr"></div>
+                    <div class="resize-handle resize-bl"></div>
+                    <div class="resize-handle resize-br"></div>
+                </div>
+            </div>
+        `;
     }
     return `<div>Unknown block type</div>`;
 }
@@ -227,6 +360,72 @@ function renderProperties() {
                 <input type="text" class="form-control prop-input" data-field="content.image" value="${block.content.image}">
             </div>
         `;
+    } else if (block.type === 'button') {
+        html += `
+            <div class="form-group">
+                <label>Button Text</label>
+                <input type="text" class="form-control prop-input" data-field="content.text" value="${block.content.text}">
+            </div>
+            <div class="form-group">
+                <label>Link URL</label>
+                <input type="text" class="form-control prop-input" data-field="content.link" value="${block.content.link}">
+            </div>
+            <div class="form-group">
+                <label>Shape</label>
+                <select class="form-control prop-input" data-field="content.shape">
+                    <option value="square" ${block.content.shape === 'square' ? 'selected' : ''}>Square</option>
+                    <option value="rounded" ${block.content.shape === 'rounded' ? 'selected' : ''}>Rounded</option>
+                    <option value="pill" ${block.content.shape === 'pill' ? 'selected' : ''}>Pill</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Background Color</label>
+                <input type="color" class="form-control prop-input" data-field="content.color" value="${block.content.color}">
+            </div>
+            <div class="form-group">
+                <label>Text Color</label>
+                <input type="color" class="form-control prop-input" data-field="content.textColor" value="${block.content.textColor}">
+            </div>
+        `;
+    } else if (block.type === 'grid-2') {
+        html += `
+            <div class="form-group"><label>Image 1 URL</label><input type="text" class="form-control prop-input" data-field="content.image1" value="${block.content.image1}"></div>
+            <div class="form-group"><label>Image 2 URL</label><input type="text" class="form-control prop-input" data-field="content.image2" value="${block.content.image2}"></div>
+        `;
+    } else if (block.type === 'grid-4') {
+        html += `
+            <div class="form-group"><label>Image 1 URL</label><input type="text" class="form-control prop-input" data-field="content.image1" value="${block.content.image1}"></div>
+            <div class="form-group"><label>Image 2 URL</label><input type="text" class="form-control prop-input" data-field="content.image2" value="${block.content.image2}"></div>
+            <div class="form-group"><label>Image 3 URL</label><input type="text" class="form-control prop-input" data-field="content.image3" value="${block.content.image3}"></div>
+            <div class="form-group"><label>Image 4 URL</label><input type="text" class="form-control prop-input" data-field="content.image4" value="${block.content.image4}"></div>
+        `;
+    } else if (block.type === 'freeform') {
+        html += `
+            <div class="form-group">
+                <label>Media Type</label>
+                <select class="form-control prop-input" data-field="content.mediaType">
+                    <option value="image" ${block.content.mediaType === 'image' ? 'selected' : ''}>Image File</option>
+                    <option value="video" ${block.content.mediaType === 'video' ? 'selected' : ''}>Video File (.mp4)</option>
+                    <option value="youtube" ${block.content.mediaType === 'youtube' ? 'selected' : ''}>YouTube ID</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Media Source (URL or YouTube ID)</label>
+                <input type="text" class="form-control prop-input" data-field="content.src" value="${block.content.src}">
+            </div>
+            <div class="form-group">
+                <label>Resizing Mode</label>
+                <select class="form-control prop-input" data-field="content.objectFit">
+                    <option value="cover" ${block.content.objectFit === 'cover' ? 'selected' : ''}>Crop to fill</option>
+                    <option value="fill" ${block.content.objectFit === 'fill' ? 'selected' : ''}>Stretch to fill</option>
+                    <option value="contain" ${block.content.objectFit === 'contain' ? 'selected' : ''}>Fit inside (letterbox)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Layer (Z-Index)</label>
+                <input type="number" class="form-control prop-input" data-field="content.zIndex" value="${block.content.zIndex}" min="1" max="999">
+            </div>
+        `;
     }
 
     // Animation Settings (Common for all blocks)
@@ -256,6 +455,21 @@ function renderProperties() {
 }
 
 function setupEventListeners() {
+    // Device Toggles
+    const deviceToggles = document.querySelectorAll('#device-toggles .btn-icon');
+    deviceToggles.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            deviceToggles.forEach(b => b.classList.remove('active'));
+            const target = e.currentTarget;
+            target.classList.add('active');
+            
+            const view = target.dataset.view;
+            state.deviceView = view;
+            
+            elements.canvas.className = 'canvas view-' + view;
+        });
+    });
+
     // Add block from palette
     elements.palette.addEventListener('click', (e) => {
         const paletteBlock = e.target.closest('.palette-block');
@@ -345,6 +559,39 @@ function generateExportCode() {
     <style>
         body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow-x: hidden; }
         * { box-sizing: border-box; }
+        
+        /* Button Blocks */
+        .btn-block-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-shape-square { border-radius: 0; }
+        .btn-shape-rounded { border-radius: 8px; }
+        .btn-shape-pill { border-radius: 50px; }
+        
+        /* Freeform Blocks */
+        .freeform-container { 
+            position: relative; 
+            width: 100%; 
+            min-height: 600px; 
+            background-color: #f9fafb; 
+            overflow: hidden; 
+        }
+        .freeform-item { 
+            position: absolute; 
+            box-sizing: border-box;
+        }
+        .media-content { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+        }
     </style>
 </head>
 <body>
@@ -416,6 +663,37 @@ function addBlock(type) {
             title: 'Immersive Experiences',
             text: 'This image will pin to the side while you read this text, creating a beautiful scrollytelling effect.',
             image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop'
+        };
+    } else if (type === 'button') {
+        defaultContent = {
+            text: 'Click Me',
+            link: '#',
+            shape: 'rounded',
+            color: '#6366f1',
+            textColor: '#ffffff'
+        };
+    } else if (type === 'grid-2') {
+        defaultContent = {
+            image1: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=1000&auto=format&fit=crop',
+            image2: 'https://images.unsplash.com/photo-1682687982501-1e58f813f228?q=80&w=1000&auto=format&fit=crop'
+        };
+    } else if (type === 'grid-4') {
+        defaultContent = {
+            image1: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=800&auto=format&fit=crop',
+            image2: 'https://images.unsplash.com/photo-1682687982501-1e58f813f228?q=80&w=800&auto=format&fit=crop',
+            image3: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=800&auto=format&fit=crop',
+            image4: 'https://images.unsplash.com/photo-1682687982185-531d09ec56fc?q=80&w=800&auto=format&fit=crop'
+        };
+    } else if (type === 'freeform') {
+        defaultContent = {
+            mediaType: 'image', // image, video, youtube
+            src: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1000&auto=format&fit=crop',
+            objectFit: 'cover', // cover for crop, fill for stretch
+            x: 50,
+            y: 50,
+            width: 400,
+            height: 300,
+            zIndex: 10
         };
     }
 
