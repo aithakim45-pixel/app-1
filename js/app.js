@@ -520,8 +520,9 @@ function setupEventListeners() {
 
     // Export Code Modal
     document.getElementById('btn-export').addEventListener('click', () => {
-        const exportedHTML = generateExportCode();
-        document.getElementById('export-code').value = exportedHTML;
+        const exportedData = generateExportCode();
+        document.getElementById('export-code-html').value = exportedData.html;
+        document.getElementById('export-code-css').value = exportedData.css;
         document.getElementById('export-modal').classList.remove('hidden');
     });
 
@@ -529,15 +530,22 @@ function setupEventListeners() {
         document.getElementById('export-modal').classList.add('hidden');
     });
 
-    document.getElementById('btn-copy-code').addEventListener('click', () => {
-        const copyText = document.getElementById('export-code');
+    const copyToClipboard = (inputId, btnId, originalText) => {
+        const copyText = document.getElementById(inputId);
         copyText.select();
         document.execCommand('copy');
         
-        const btn = document.getElementById('btn-copy-code');
-        const originalText = btn.innerHTML;
+        const btn = document.getElementById(btnId);
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
         setTimeout(() => btn.innerHTML = originalText, 2000);
+    };
+
+    document.getElementById('btn-copy-html').addEventListener('click', () => {
+        copyToClipboard('export-code-html', 'btn-copy-html', '<i class="fa-solid fa-copy"></i> Copy HTML');
+    });
+
+    document.getElementById('btn-copy-css').addEventListener('click', () => {
+        copyToClipboard('export-code-css', 'btn-copy-css', '<i class="fa-solid fa-copy"></i> Copy CSS');
     });
 }
 
@@ -549,50 +557,50 @@ function generateExportCode() {
         </div>
     `).join('\n');
 
-    return `<!DOCTYPE html>
+    const cssCode = `body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+* { box-sizing: border-box; }
+
+/* Button Blocks */
+.btn-block-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-shape-square { border-radius: 0; }
+.btn-shape-rounded { border-radius: 8px; }
+.btn-shape-pill { border-radius: 50px; }
+
+/* Freeform Blocks */
+.freeform-container { 
+    position: relative; 
+    width: 100%; 
+    min-height: 600px; 
+    background-color: #f9fafb; 
+    overflow: hidden; 
+}
+.freeform-item { 
+    position: absolute; 
+    box-sizing: border-box;
+}
+.media-content { 
+    width: 100%; 
+    height: 100%; 
+    display: block; 
+}`;
+
+    const htmlCode = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Scrollytelling Site</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow-x: hidden; }
-        * { box-sizing: border-box; }
-        
-        /* Button Blocks */
-        .btn-block-btn {
-            display: inline-block;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: 600;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-shape-square { border-radius: 0; }
-        .btn-shape-rounded { border-radius: 8px; }
-        .btn-shape-pill { border-radius: 50px; }
-        
-        /* Freeform Blocks */
-        .freeform-container { 
-            position: relative; 
-            width: 100%; 
-            min-height: 600px; 
-            background-color: #f9fafb; 
-            overflow: hidden; 
-        }
-        .freeform-item { 
-            position: absolute; 
-            box-sizing: border-box;
-        }
-        .media-content { 
-            width: 100%; 
-            height: 100%; 
-            display: block; 
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     
@@ -643,6 +651,8 @@ ${blocksHtml}
     </script>
 </body>
 </html>`;
+
+    return { html: htmlCode, css: cssCode };
 }
 
 function addBlock(type) {
