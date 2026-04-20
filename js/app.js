@@ -1,58 +1,25 @@
 // State Management
 const state = {
-    blocks: [],
-    selectedBlockId: null,
-    deviceView: 'desktop'
+    elements: [],
+    selectedElementId: null,
+    deviceView: 'desktop',
+    canvasSettings: {
+        height: 2000,
+        backgroundColor: '#ffffff'
+    }
 };
 
-// Available Block Definitions
-const BLOCK_TYPES = [
-    {
-        id: 'hero',
-        name: 'Hero Section',
-        icon: 'fa-image',
-        description: 'Large header with title and background'
-    },
-    {
-        id: 'text',
-        name: 'Text Block',
-        icon: 'fa-align-left',
-        description: 'Simple paragraph text'
-    },
-    {
-        id: 'scrolly-image-text',
-        name: 'Scroll: Pinned Image',
-        icon: 'fa-film',
-        description: 'Image pins while text scrolls'
-    },
-    {
-        id: 'button',
-        name: 'Button',
-        icon: 'fa-square-up-right',
-        description: 'Customizable link button'
-    },
-    {
-        id: 'grid-2',
-        name: '2-Image Grid',
-        icon: 'fa-table-columns',
-        description: 'Two images side-by-side'
-    },
-    {
-        id: 'grid-4',
-        name: '4-Image Grid',
-        icon: 'fa-border-all',
-        description: 'Four images in a 2x2 grid'
-    },
-    {
-        id: 'freeform',
-        name: 'Freeform Media',
-        icon: 'fa-vector-square',
-        description: 'Drag & drop image/video anywhere'
-    }
+// Available Element Definitions
+const ELEMENT_TYPES = [
+    { id: 'text', name: 'Text', icon: 'fa-font', description: 'Add a text box' },
+    { id: 'image', name: 'Image', icon: 'fa-image', description: 'Add an image' },
+    { id: 'video', name: 'Video', icon: 'fa-video', description: 'Add a local video' },
+    { id: 'youtube', name: 'YouTube', icon: 'fa-youtube', description: 'Embed a YouTube video' },
+    { id: 'button', name: 'Button', icon: 'fa-square-up-right', description: 'Interactive button' }
 ];
 
 // DOM Elements
-const elements = {
+const dom = {
     palette: document.getElementById('block-palette'),
     canvas: document.getElementById('canvas'),
     properties: document.getElementById('properties-panel')
@@ -67,9 +34,9 @@ function init() {
 }
 
 function initInteractJS() {
-    if (typeof interact === 'undefined') return; // Safety check
+    if (typeof interact === 'undefined') return;
     
-    interact('.freeform-item')
+    interact('.canvas-element')
         .draggable({
             modifiers: [
                 interact.modifiers.restrictRect({
@@ -80,20 +47,20 @@ function initInteractJS() {
             listeners: {
                 start(event) {
                     const id = event.target.dataset.id;
-                    if (state.selectedBlockId !== id) {
-                        selectBlock(id);
+                    if (state.selectedElementId !== id) {
+                        selectElement(id);
                     }
                 },
                 move(event) {
                     const target = event.target;
                     const id = target.dataset.id;
-                    const block = state.blocks.find(b => b.id === id);
-                    if (!block) return;
+                    const element = state.elements.find(e => e.id === id);
+                    if (!element) return;
                     
-                    block.content.x += event.dx;
-                    block.content.y += event.dy;
+                    element.content.x += event.dx;
+                    element.content.y += event.dy;
                     
-                    target.style.transform = `translate(${block.content.x}px, ${block.content.y}px)`;
+                    target.style.transform = `translate(${element.content.x}px, ${element.content.y}px)`;
                 }
             }
         })
@@ -108,29 +75,29 @@ function initInteractJS() {
                 move(event) {
                     const target = event.target;
                     const id = target.dataset.id;
-                    const block = state.blocks.find(b => b.id === id);
-                    if (!block) return;
+                    const element = state.elements.find(e => e.id === id);
+                    if (!element) return;
 
-                    block.content.x += event.deltaRect.left;
-                    block.content.y += event.deltaRect.top;
-                    block.content.width = event.rect.width;
-                    block.content.height = event.rect.height;
+                    element.content.x += event.deltaRect.left;
+                    element.content.y += event.deltaRect.top;
+                    element.content.width = event.rect.width;
+                    element.content.height = event.rect.height;
 
-                    target.style.width = `${block.content.width}px`;
-                    target.style.height = `${block.content.height}px`;
-                    target.style.transform = `translate(${block.content.x}px, ${block.content.y}px)`;
+                    target.style.width = `${element.content.width}px`;
+                    target.style.height = `${element.content.height}px`;
+                    target.style.transform = `translate(${element.content.x}px, ${element.content.y}px)`;
                 }
             }
         });
 }
 
 function renderPalette() {
-    elements.palette.innerHTML = BLOCK_TYPES.map(block => `
-        <div class="palette-block" data-type="${block.id}">
-            <i class="fa-solid ${block.icon}"></i>
+    dom.palette.innerHTML = ELEMENT_TYPES.map(el => `
+        <div class="palette-block" data-type="${el.id}">
+            <i class="fa-solid ${el.icon}"></i>
             <div class="palette-block-info">
-                <h4>${block.name}</h4>
-                <p>${block.description}</p>
+                <h4>${el.name}</h4>
+                <p>${el.description}</p>
             </div>
             <i class="fa-solid fa-plus" style="margin-left: auto; color: var(--text-muted);"></i>
         </div>
@@ -138,179 +105,96 @@ function renderPalette() {
 }
 
 function renderCanvas() {
-    if (state.blocks.length === 0) {
-        elements.canvas.innerHTML = `
+    let html = `<div class="canvas-inner" style="height: ${state.canvasSettings.height}px; background-color: ${state.canvasSettings.backgroundColor};">`;
+    
+    if (state.elements.length === 0) {
+        html += `
             <div class="empty-state">
-                <i class="fa-solid fa-layer-group"></i>
-                <p>Drag or click a block from the left to start building</p>
+                <i class="fa-solid fa-object-group"></i>
+                <p>Drag or click an element from the left to start building</p>
             </div>
         `;
-        return;
+    } else {
+        html += state.elements.map(el => `
+            <div class="canvas-element ${el.id === state.selectedElementId ? 'selected' : ''}" 
+                 data-id="${el.id}"
+                 style="transform: translate(${el.content.x}px, ${el.content.y}px); width: ${el.content.width}px; height: ${el.content.height}px; z-index: ${el.content.zIndex};">
+                
+                <div class="block-controls">
+                    <button class="btn-delete-element" data-id="${el.id}"><i class="fa-solid fa-trash"></i></button>
+                </div>
+                
+                ${renderElementContent(el)}
+                
+                <div class="resize-handle resize-tl"></div>
+                <div class="resize-handle resize-tr"></div>
+                <div class="resize-handle resize-bl"></div>
+                <div class="resize-handle resize-br"></div>
+            </div>
+        `).join('');
     }
+    
+    html += `</div>`;
+    dom.canvas.innerHTML = html;
 
-    elements.canvas.innerHTML = state.blocks.map(block => `
-        <div class="canvas-block-wrapper ${block.id === state.selectedBlockId ? 'selected' : ''}" data-id="${block.id}">
-            <div class="block-controls">
-                <button class="btn-delete-block" data-id="${block.id}"><i class="fa-solid fa-trash"></i></button>
-            </div>
-            <div class="canvas-block">
-                ${renderBlockContent(block)}
-            </div>
-        </div>
-    `).join('');
-
-    // Wait a brief moment for the DOM to update, then init animations
     setTimeout(initAnimations, 50);
 }
 
-function initAnimations() {
-    // Clean up old triggers
-    ScrollTrigger.getAll().forEach(t => t.kill());
-
-    state.blocks.forEach(block => {
-        const wrapper = document.querySelector(`[data-id="${block.id}"]`);
-        if (!wrapper) return;
-        
-        const el = wrapper.querySelector('.canvas-block');
-
-        // 1. Specialized Pinning Animation for Scrolly Block
-        if (block.type === 'scrolly-image-text') {
-            const imageEl = el.querySelector('.scrolly-img-col');
-            if (imageEl) {
-                ScrollTrigger.create({
-                    trigger: el,
-                    scroller: elements.canvas,
-                    pin: imageEl,
-                    start: "top top",
-                    end: "bottom bottom"
-                });
-            }
-        }
-
-        // 2. Entrance Animations
-        if (block.animations.type === 'none') return;
-
-        let fromVars = {
-            opacity: 0,
-            duration: parseFloat(block.animations.duration),
-            ease: "power2.out",
-            clearProps: "all",
-            scrollTrigger: {
-                trigger: wrapper,
-                scroller: elements.canvas,
-                start: "top 85%", // trigger when top of element hits 85% down viewport
-                toggleActions: "play none none reverse"
-            }
-        };
-
-        if (block.animations.type === 'slideUp') {
-            fromVars.y = 100;
-        } else if (block.animations.type === 'zoomIn') {
-            fromVars.scale = 0.8;
-        }
-
-        gsap.from(el, fromVars);
-    });
-}
-
-function renderBlockContent(block) {
-    if (block.type === 'hero') {
+function renderElementContent(el) {
+    if (el.type === 'text') {
+        const fontWeight = el.content.isBold ? 'bold' : 'normal';
+        const fontStyle = el.content.isItalic ? 'italic' : 'normal';
         return `
-            <div style="background-color: #111827; color: white; padding: 100px 40px; text-align: center; background-image: url('${block.content.bgImage}'); background-size: cover; background-position: center; position: relative;">
-                <div style="position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.6);"></div>
-                <div style="position: relative; z-index: 1;">
-                    <h1 style="font-size: 48px; font-weight: 800; margin-bottom: 20px;">${block.content.title}</h1>
-                    <p style="font-size: 20px; color: #d1d5db; max-width: 600px; margin: 0 auto;">${block.content.subtitle}</p>
-                </div>
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px; box-sizing: border-box; overflow: hidden;
+                        background-color: ${el.content.bgColor}; color: ${el.content.textColor}; font-size: ${el.content.fontSize}px; text-align: ${el.content.align}; font-weight: ${fontWeight}; font-style: ${fontStyle};">
+                ${el.content.text.replace(/\n/g, '<br>')}
             </div>
         `;
-    } else if (block.type === 'text') {
+    } else if (el.type === 'image') {
+        return `<img src="${el.content.src}" class="media-content" style="object-fit: ${el.content.objectFit};">`;
+    } else if (el.type === 'video') {
+        return `<video src="${el.content.src}" class="media-content" style="object-fit: ${el.content.objectFit};" autoplay loop muted playsinline></video>`;
+    } else if (el.type === 'youtube') {
+        return `<iframe src="https://www.youtube.com/embed/${el.content.src}?autoplay=1&mute=1&loop=1&controls=0" class="media-content" frameborder="0" allow="autoplay; fullscreen" style="object-fit: ${el.content.objectFit}; pointer-events:none;"></iframe>`;
+    } else if (el.type === 'button') {
         return `
-            <div style="background-color: white; color: #1f2937; padding: 60px 40px; max-width: 800px; margin: 0 auto;">
-                <h2 style="font-size: 32px; font-weight: 700; margin-bottom: 20px;">${block.content.title}</h2>
-                <p style="font-size: 18px; line-height: 1.6; color: #4b5563;">${block.content.text}</p>
-            </div>
-        `;
-    } else if (block.type === 'scrolly-image-text') {
-        return `
-            <div style="display: flex; min-height: 800px; background-color: #f3f4f6; color: #111827;">
-                <div style="flex: 1; padding: 60px; display: flex; flex-direction: column; justify-content: center;">
-                    <h2 style="font-size: 36px; font-weight: 800; margin-bottom: 20px;">${block.content.title}</h2>
-                    <p style="font-size: 18px; line-height: 1.6;">${block.content.text}</p>
-                </div>
-                <div style="flex: 1; position: relative;">
-                    <div class="scrolly-img-col" style="position: absolute; top:0; left:0; width:100%; height:100vh; background-image: url('${block.content.image}'); background-size: cover; background-position: center;"></div>
-                </div>
-            </div>
-        `;
-    } else if (block.type === 'button') {
-        return `
-            <div style="padding: 40px; text-align: center;">
-                <a href="${block.content.link}" class="btn-block-btn btn-shape-${block.content.shape}" style="background-color: ${block.content.color}; color: ${block.content.textColor};">
-                    ${block.content.text}
+            <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;">
+                <a href="${el.content.link}" class="btn-block-btn btn-shape-${el.content.shape}" style="background-color: ${el.content.color}; color: ${el.content.textColor}; width: 100%; height: 100%; display:flex; justify-content:center; align-items:center;">
+                    ${el.content.text}
                 </a>
             </div>
         `;
-    } else if (block.type === 'grid-2') {
-        return `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 40px; max-width: 1200px; margin: 0 auto;">
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image1}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image2}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-            </div>
-        `;
-    } else if (block.type === 'grid-4') {
-        return `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 40px; max-width: 1200px; margin: 0 auto;">
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image1}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image2}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image3}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-                <div style="aspect-ratio: 4/3; background-image: url('${block.content.image4}'); background-size: cover; background-position: center; border-radius: 8px;"></div>
-            </div>
-        `;
-    } else if (block.type === 'freeform') {
-        let mediaHtml = '';
-        if (block.content.mediaType === 'image') {
-            mediaHtml = `<img src="${block.content.src}" class="media-content" style="object-fit: ${block.content.objectFit};">`;
-        } else if (block.content.mediaType === 'video') {
-            mediaHtml = `<video src="${block.content.src}" class="media-content" style="object-fit: ${block.content.objectFit};" autoplay loop muted playsinline></video>`;
-        } else if (block.content.mediaType === 'youtube') {
-            mediaHtml = `<iframe src="https://www.youtube.com/embed/${block.content.src}?autoplay=1&mute=1&loop=1&controls=0" class="media-content" frameborder="0" allow="autoplay; fullscreen" style="object-fit: ${block.content.objectFit}; pointer-events:none;"></iframe>`;
-        }
-        
-        return `
-            <div class="freeform-container">
-                <div class="freeform-item ${block.id === state.selectedBlockId ? 'selected' : ''}" 
-                     data-id="${block.id}"
-                     style="transform: translate(${block.content.x}px, ${block.content.y}px); width: ${block.content.width}px; height: ${block.content.height}px; z-index: ${block.content.zIndex};">
-                    
-                    ${mediaHtml}
-                    
-                    <div class="resize-handle resize-tl"></div>
-                    <div class="resize-handle resize-tr"></div>
-                    <div class="resize-handle resize-bl"></div>
-                    <div class="resize-handle resize-br"></div>
-                </div>
-            </div>
-        `;
     }
-    return `<div>Unknown block type</div>`;
+    return `<div>Unknown element</div>`;
 }
 
 function renderProperties() {
-    if (!state.selectedBlockId) {
-        elements.properties.innerHTML = '<div class="empty-state-small">Select a block to edit its properties and animations</div>';
+    if (!state.selectedElementId) {
+        dom.properties.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; font-weight:600;">Canvas Settings</label>
+                <div class="form-group">
+                    <label>Canvas Height (px)</label>
+                    <input type="number" class="form-control prop-input-canvas" data-field="height" value="${state.canvasSettings.height}">
+                </div>
+                <div class="form-group">
+                    <label>Background Color</label>
+                    <input type="color" class="form-control prop-input-canvas" data-field="backgroundColor" value="${state.canvasSettings.backgroundColor}">
+                </div>
+            </div>
+        `;
         return;
     }
 
-    const block = state.blocks.find(b => b.id === state.selectedBlockId);
-    const blockTypeInfo = BLOCK_TYPES.find(t => t.id === block.type);
+    const el = state.elements.find(e => e.id === state.selectedElementId);
+    const typeInfo = ELEMENT_TYPES.find(t => t.id === el.type);
     
     let html = `
         <div style="margin-bottom: 20px;">
-            <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; font-weight:600;">Block Type</label>
+            <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; font-weight:600;">Element Type</label>
             <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; font-size: 14px; display:flex; align-items:center; gap:10px;">
-                <i class="fa-solid ${blockTypeInfo.icon}" style="color:var(--accent-color);"></i>
-                <span>${blockTypeInfo.name}</span>
+                <i class="fa-solid ${typeInfo.icon}" style="color:var(--accent-color);"></i>
+                <span>${typeInfo.name}</span>
             </div>
         </div>
         
@@ -318,207 +202,203 @@ function renderProperties() {
             <h4 style="margin-bottom: 15px; font-size: 14px;">Content Settings</h4>
     `;
 
-    // Dynamic Content Fields based on block type
-    if (block.type === 'hero') {
+    // Dynamic Fields
+    if (el.type === 'text') {
         html += `
-            <div class="form-group">
-                <label>Title</label>
-                <input type="text" class="form-control prop-input" data-field="content.title" value="${block.content.title}">
-            </div>
-            <div class="form-group">
-                <label>Subtitle</label>
-                <input type="text" class="form-control prop-input" data-field="content.subtitle" value="${block.content.subtitle}">
-            </div>
-            <div class="form-group">
-                <label>Background Image URL</label>
-                <input type="text" class="form-control prop-input" data-field="content.bgImage" value="${block.content.bgImage}">
-            </div>
-        `;
-    } else if (block.type === 'text') {
-        html += `
-            <div class="form-group">
-                <label>Title</label>
-                <input type="text" class="form-control prop-input" data-field="content.title" value="${block.content.title}">
-            </div>
             <div class="form-group">
                 <label>Text Content</label>
-                <textarea class="form-control prop-input" data-field="content.text">${block.content.text}</textarea>
-            </div>
-        `;
-    } else if (block.type === 'scrolly-image-text') {
-        html += `
-            <div class="form-group">
-                <label>Title</label>
-                <input type="text" class="form-control prop-input" data-field="content.title" value="${block.content.title}">
+                <textarea class="form-control prop-input" data-field="content.text">${el.content.text}</textarea>
             </div>
             <div class="form-group">
-                <label>Text Content</label>
-                <textarea class="form-control prop-input" data-field="content.text">${block.content.text}</textarea>
-            </div>
-            <div class="form-group">
-                <label>Pinned Image URL</label>
-                <input type="text" class="form-control prop-input" data-field="content.image" value="${block.content.image}">
-            </div>
-        `;
-    } else if (block.type === 'button') {
-        html += `
-            <div class="form-group">
-                <label>Button Text</label>
-                <input type="text" class="form-control prop-input" data-field="content.text" value="${block.content.text}">
-            </div>
-            <div class="form-group">
-                <label>Link URL</label>
-                <input type="text" class="form-control prop-input" data-field="content.link" value="${block.content.link}">
-            </div>
-            <div class="form-group">
-                <label>Shape</label>
-                <select class="form-control prop-input" data-field="content.shape">
-                    <option value="square" ${block.content.shape === 'square' ? 'selected' : ''}>Square</option>
-                    <option value="rounded" ${block.content.shape === 'rounded' ? 'selected' : ''}>Rounded</option>
-                    <option value="pill" ${block.content.shape === 'pill' ? 'selected' : ''}>Pill</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Background Color</label>
-                <input type="color" class="form-control prop-input" data-field="content.color" value="${block.content.color}">
+                <label>Font Size (px)</label>
+                <input type="number" class="form-control prop-input" data-field="content.fontSize" value="${el.content.fontSize}">
             </div>
             <div class="form-group">
                 <label>Text Color</label>
-                <input type="color" class="form-control prop-input" data-field="content.textColor" value="${block.content.textColor}">
+                <input type="color" class="form-control prop-input" data-field="content.textColor" value="${el.content.textColor}">
             </div>
-        `;
-    } else if (block.type === 'grid-2') {
-        html += `
-            <div class="form-group"><label>Image 1 URL</label><input type="text" class="form-control prop-input" data-field="content.image1" value="${block.content.image1}"></div>
-            <div class="form-group"><label>Image 2 URL</label><input type="text" class="form-control prop-input" data-field="content.image2" value="${block.content.image2}"></div>
-        `;
-    } else if (block.type === 'grid-4') {
-        html += `
-            <div class="form-group"><label>Image 1 URL</label><input type="text" class="form-control prop-input" data-field="content.image1" value="${block.content.image1}"></div>
-            <div class="form-group"><label>Image 2 URL</label><input type="text" class="form-control prop-input" data-field="content.image2" value="${block.content.image2}"></div>
-            <div class="form-group"><label>Image 3 URL</label><input type="text" class="form-control prop-input" data-field="content.image3" value="${block.content.image3}"></div>
-            <div class="form-group"><label>Image 4 URL</label><input type="text" class="form-control prop-input" data-field="content.image4" value="${block.content.image4}"></div>
-        `;
-    } else if (block.type === 'freeform') {
-        html += `
             <div class="form-group">
-                <label>Media Type</label>
-                <select class="form-control prop-input" data-field="content.mediaType">
-                    <option value="image" ${block.content.mediaType === 'image' ? 'selected' : ''}>Image File</option>
-                    <option value="video" ${block.content.mediaType === 'video' ? 'selected' : ''}>Video File (.mp4)</option>
-                    <option value="youtube" ${block.content.mediaType === 'youtube' ? 'selected' : ''}>YouTube ID</option>
+                <label>Background Color</label>
+                <input type="color" class="form-control prop-input" data-field="content.bgColor" value="${el.content.bgColor}">
+            </div>
+            <div class="form-group">
+                <label>Alignment</label>
+                <select class="form-control prop-input" data-field="content.align">
+                    <option value="left" ${el.content.align === 'left' ? 'selected' : ''}>Left</option>
+                    <option value="center" ${el.content.align === 'center' ? 'selected' : ''}>Center</option>
+                    <option value="right" ${el.content.align === 'right' ? 'selected' : ''}>Right</option>
                 </select>
             </div>
+            <div class="form-group" style="display: flex; gap: 10px;">
+                <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" class="prop-input-check" data-field="content.isBold" ${el.content.isBold ? 'checked' : ''}> Bold</label>
+                <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" class="prop-input-check" data-field="content.isItalic" ${el.content.isItalic ? 'checked' : ''}> Italic</label>
+            </div>
+        `;
+    } else if (el.type === 'image' || el.type === 'video' || el.type === 'youtube') {
+        html += `
             <div class="form-group">
-                <label>Media Source (URL or YouTube ID)</label>
-                <input type="text" class="form-control prop-input" data-field="content.src" value="${block.content.src}">
+                <label>Source (URL or ID)</label>
+                <input type="text" class="form-control prop-input" data-field="content.src" value="${el.content.src}">
             </div>
             <div class="form-group">
                 <label>Resizing Mode</label>
                 <select class="form-control prop-input" data-field="content.objectFit">
-                    <option value="cover" ${block.content.objectFit === 'cover' ? 'selected' : ''}>Crop to fill</option>
-                    <option value="fill" ${block.content.objectFit === 'fill' ? 'selected' : ''}>Stretch to fill</option>
-                    <option value="contain" ${block.content.objectFit === 'contain' ? 'selected' : ''}>Fit inside (letterbox)</option>
+                    <option value="cover" ${el.content.objectFit === 'cover' ? 'selected' : ''}>Crop to fill</option>
+                    <option value="fill" ${el.content.objectFit === 'fill' ? 'selected' : ''}>Stretch to fill</option>
+                    <option value="contain" ${el.content.objectFit === 'contain' ? 'selected' : ''}>Fit inside</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label>Layer (Z-Index)</label>
-                <input type="number" class="form-control prop-input" data-field="content.zIndex" value="${block.content.zIndex}" min="1" max="999">
+        `;
+    } else if (el.type === 'button') {
+        html += `
+            <div class="form-group"><label>Button Text</label><input type="text" class="form-control prop-input" data-field="content.text" value="${el.content.text}"></div>
+            <div class="form-group"><label>Link URL</label><input type="text" class="form-control prop-input" data-field="content.link" value="${el.content.link}"></div>
+            <div class="form-group"><label>Shape</label>
+                <select class="form-control prop-input" data-field="content.shape">
+                    <option value="square" ${el.content.shape === 'square' ? 'selected' : ''}>Square</option>
+                    <option value="rounded" ${el.content.shape === 'rounded' ? 'selected' : ''}>Rounded</option>
+                    <option value="pill" ${el.content.shape === 'pill' ? 'selected' : ''}>Pill</option>
+                </select>
             </div>
+            <div class="form-group"><label>Button Color</label><input type="color" class="form-control prop-input" data-field="content.color" value="${el.content.color}"></div>
+            <div class="form-group"><label>Text Color</label><input type="color" class="form-control prop-input" data-field="content.textColor" value="${el.content.textColor}"></div>
         `;
     }
 
-    // Animation Settings (Common for all blocks)
+    // Advanced Positioning
     html += `
+            <div class="form-group" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">
+                <label>Layer (Z-Index)</label>
+                <input type="number" class="form-control prop-input" data-field="content.zIndex" value="${el.content.zIndex}">
+            </div>
         </div>
         <div style="padding-top: 15px; border-top: 1px solid var(--border-color); margin-top: 20px;">
-            <h4 style="margin-bottom: 15px; font-size: 14px;">Animation Settings</h4>
+            <h4 style="margin-bottom: 15px; font-size: 14px;">Animation on Scroll</h4>
             
             <div class="form-group">
                 <label>Entrance Animation</label>
                 <select class="form-control prop-input" data-field="animations.type">
-                    <option value="none" ${block.animations.type === 'none' ? 'selected' : ''}>None</option>
-                    <option value="fade" ${block.animations.type === 'fade' ? 'selected' : ''}>Fade In</option>
-                    <option value="slideUp" ${block.animations.type === 'slideUp' ? 'selected' : ''}>Slide Up</option>
-                    <option value="zoomIn" ${block.animations.type === 'zoomIn' ? 'selected' : ''}>Zoom In</option>
+                    <option value="none" ${el.animations.type === 'none' ? 'selected' : ''}>None</option>
+                    <option value="fade" ${el.animations.type === 'fade' ? 'selected' : ''}>Fade In</option>
+                    <option value="slideUp" ${el.animations.type === 'slideUp' ? 'selected' : ''}>Slide Up</option>
+                    <option value="slideDown" ${el.animations.type === 'slideDown' ? 'selected' : ''}>Slide Down</option>
+                    <option value="slideLeft" ${el.animations.type === 'slideLeft' ? 'selected' : ''}>Slide Left</option>
+                    <option value="slideRight" ${el.animations.type === 'slideRight' ? 'selected' : ''}>Slide Right</option>
+                    <option value="zoomIn" ${el.animations.type === 'zoomIn' ? 'selected' : ''}>Zoom In</option>
+                    <option value="zoomOut" ${el.animations.type === 'zoomOut' ? 'selected' : ''}>Zoom Out</option>
+                    <option value="rotate" ${el.animations.type === 'rotate' ? 'selected' : ''}>Rotate In</option>
                 </select>
             </div>
             
             <div class="form-group">
-                <label>Animation Duration: <span id="dur-val-${block.id}">${block.animations.duration}s</span></label>
-                <input type="range" class="form-control prop-input" data-field="animations.duration" min="0.5" max="5" step="0.5" value="${block.animations.duration}" oninput="document.getElementById('dur-val-${block.id}').textContent = this.value + 's'">
+                <label>Animation Duration: <span id="dur-val-${el.id}">${el.animations.duration}s</span></label>
+                <input type="range" class="form-control prop-input" data-field="animations.duration" min="0.2" max="5" step="0.1" value="${el.animations.duration}" oninput="document.getElementById('dur-val-${el.id}').textContent = this.value + 's'">
+            </div>
+            <div class="form-group">
+                <label>Delay: <span id="delay-val-${el.id}">${el.animations.delay || 0}s</span></label>
+                <input type="range" class="form-control prop-input" data-field="animations.delay" min="0" max="3" step="0.1" value="${el.animations.delay || 0}" oninput="document.getElementById('delay-val-${el.id}').textContent = this.value + 's'">
             </div>
         </div>
     `;
 
-    elements.properties.innerHTML = html;
+    dom.properties.innerHTML = html;
+}
+
+function initAnimations() {
+    ScrollTrigger.getAll().forEach(t => t.kill());
+
+    state.elements.forEach(el => {
+        if (el.animations.type === 'none') return;
+        
+        const wrapper = document.querySelector(`[data-id="${el.id}"]`);
+        if (!wrapper) return;
+
+        let fromVars = {
+            opacity: 0,
+            duration: parseFloat(el.animations.duration),
+            delay: parseFloat(el.animations.delay || 0),
+            ease: "power2.out",
+            clearProps: "all",
+            scrollTrigger: {
+                trigger: wrapper,
+                scroller: dom.canvas,
+                start: "top 90%", 
+                toggleActions: "play none none reverse"
+            }
+        };
+
+        if (el.animations.type === 'slideUp') fromVars.y = 100;
+        if (el.animations.type === 'slideDown') fromVars.y = -100;
+        if (el.animations.type === 'slideLeft') fromVars.x = 100;
+        if (el.animations.type === 'slideRight') fromVars.x = -100;
+        if (el.animations.type === 'zoomIn') fromVars.scale = 0.5;
+        if (el.animations.type === 'zoomOut') fromVars.scale = 1.5;
+        if (el.animations.type === 'rotate') { fromVars.rotation = 180; fromVars.scale = 0.5; }
+
+        gsap.from(wrapper, fromVars);
+    });
 }
 
 function setupEventListeners() {
-    // Device Toggles
     const deviceToggles = document.querySelectorAll('#device-toggles .btn-icon');
     deviceToggles.forEach(btn => {
         btn.addEventListener('click', (e) => {
             deviceToggles.forEach(b => b.classList.remove('active'));
-            const target = e.currentTarget;
-            target.classList.add('active');
-            
-            const view = target.dataset.view;
-            state.deviceView = view;
-            
-            elements.canvas.className = 'canvas view-' + view;
+            e.currentTarget.classList.add('active');
+            state.deviceView = e.currentTarget.dataset.view;
+            dom.canvas.className = 'canvas view-' + state.deviceView;
         });
     });
 
-    // Add block from palette
-    elements.palette.addEventListener('click', (e) => {
+    dom.palette.addEventListener('click', (e) => {
         const paletteBlock = e.target.closest('.palette-block');
-        if (paletteBlock) {
-            const type = paletteBlock.dataset.type;
-            addBlock(type);
-        }
+        if (paletteBlock) addElement(paletteBlock.dataset.type);
     });
 
-    // Select block in canvas
-    elements.canvas.addEventListener('click', (e) => {
-        const wrapper = e.target.closest('.canvas-block-wrapper');
-        const deleteBtn = e.target.closest('.btn-delete-block');
+    dom.canvas.addEventListener('click', (e) => {
+        const wrapper = e.target.closest('.canvas-element');
+        const deleteBtn = e.target.closest('.btn-delete-element');
         
         if (deleteBtn) {
-            deleteBlock(deleteBtn.dataset.id);
+            deleteElement(deleteBtn.dataset.id);
             return;
         }
 
         if (wrapper) {
-            selectBlock(wrapper.dataset.id);
+            selectElement(wrapper.dataset.id);
         } else {
-            selectBlock(null);
+            selectElement(null);
         }
     });
 
-    // Handle property changes
-    elements.properties.addEventListener('input', (e) => {
-        if (!state.selectedBlockId) return;
-        if (e.target.classList.contains('prop-input')) {
-            const field = e.target.dataset.field; // e.g., "content.title" or "animations.duration"
-            const value = e.target.value;
+    dom.properties.addEventListener('input', (e) => {
+        if (e.target.classList.contains('prop-input-canvas')) {
+            const field = e.target.dataset.field;
+            state.canvasSettings[field] = e.target.value;
+            renderCanvas();
+            return;
+        }
+
+        if (!state.selectedElementId) return;
+
+        if (e.target.classList.contains('prop-input') || e.target.classList.contains('prop-input-check')) {
+            const field = e.target.dataset.field;
+            const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
             
-            const block = state.blocks.find(b => b.id === state.selectedBlockId);
+            const el = state.elements.find(e => e.id === state.selectedElementId);
             
-            // Deep update object
             const parts = field.split('.');
             if (parts.length === 2) {
-                block[parts[0]][parts[1]] = value;
+                el[parts[0]][parts[1]] = value;
             }
 
-            // Re-render canvas but try to preserve scroll position
-            const scrollPos = elements.canvas.scrollTop;
+            const scrollPos = dom.canvas.scrollTop;
             renderCanvas();
-            elements.canvas.scrollTop = scrollPos;
+            dom.canvas.scrollTop = scrollPos;
         }
     });
 
-    // Export Code Modal
+    // Export Modal Logic
     document.getElementById('btn-export').addEventListener('click', () => {
         const exportedData = generateExportCode();
         document.getElementById('export-code-html').value = exportedData.html;
@@ -534,119 +414,85 @@ function setupEventListeners() {
         const copyText = document.getElementById(inputId);
         copyText.select();
         document.execCommand('copy');
-        
         const btn = document.getElementById(btnId);
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
         setTimeout(() => btn.innerHTML = originalText, 2000);
     };
 
-    document.getElementById('btn-copy-html').addEventListener('click', () => {
-        copyToClipboard('export-code-html', 'btn-copy-html', '<i class="fa-solid fa-copy"></i> Copy HTML');
-    });
-
-    document.getElementById('btn-copy-css').addEventListener('click', () => {
-        copyToClipboard('export-code-css', 'btn-copy-css', '<i class="fa-solid fa-copy"></i> Copy CSS');
-    });
+    document.getElementById('btn-copy-html').addEventListener('click', () => copyToClipboard('export-code-html', 'btn-copy-html', '<i class="fa-solid fa-copy"></i> Copy HTML'));
+    document.getElementById('btn-copy-css').addEventListener('click', () => copyToClipboard('export-code-css', 'btn-copy-css', '<i class="fa-solid fa-copy"></i> Copy CSS'));
 }
 
 function generateExportCode() {
-    let blocksHtml = state.blocks.map(block => `
-        <!-- Block: ${block.type} -->
-        <div class="site-block" data-anim-type="${block.animations.type}" data-anim-duration="${block.animations.duration}" data-block-type="${block.type}">
-            ${renderBlockContent(block)}
+    let elementsHtml = state.elements.map(el => `
+        <!-- Element: ${el.type} -->
+        <div class="site-element" data-anim-type="${el.animations.type}" data-anim-duration="${el.animations.duration}" data-anim-delay="${el.animations.delay || 0}" style="position: absolute; left: 0; top: 0; transform: translate(${el.content.x}px, ${el.content.y}px); width: ${el.content.width}px; height: ${el.content.height}px; z-index: ${el.content.zIndex};">
+            ${renderElementContent(el)}
         </div>
     `).join('\n');
 
-    const cssCode = `body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    const cssCode = `body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow-x: hidden; background-color: ${state.canvasSettings.backgroundColor}; }
 * { box-sizing: border-box; }
+.canvas-inner { position: relative; width: 100%; height: ${state.canvasSettings.height}px; margin: 0 auto; overflow: hidden; }
 
-/* Button Blocks */
-.btn-block-btn {
-    display: inline-block;
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: 600;
-    text-align: center;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s;
-}
+/* Buttons */
+.btn-block-btn { display: inline-block; padding: 12px 24px; font-size: 16px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; transition: all 0.2s; }
 .btn-shape-square { border-radius: 0; }
 .btn-shape-rounded { border-radius: 8px; }
 .btn-shape-pill { border-radius: 50px; }
 
-/* Freeform Blocks */
-.freeform-container { 
-    position: relative; 
-    width: 100%; 
-    min-height: 600px; 
-    background-color: #f9fafb; 
-    overflow: hidden; 
-}
-.freeform-item { 
-    position: absolute; 
-    box-sizing: border-box;
-}
-.media-content { 
-    width: 100%; 
-    height: 100%; 
-    display: block; 
-}`;
+/* Media */
+.media-content { width: 100%; height: 100%; display: block; }
+`;
 
     const htmlCode = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Scrollytelling Site</title>
+    <title>My Freeform Site</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     
-${blocksHtml}
+    <div class="canvas-inner">
+${elementsHtml}
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
     <script>
         gsap.registerPlugin(ScrollTrigger);
         
-        document.querySelectorAll('.site-block').forEach(wrapper => {
-            const type = wrapper.dataset.blockType;
+        document.querySelectorAll('.site-element').forEach(wrapper => {
             const animType = wrapper.dataset.animType;
             const duration = parseFloat(wrapper.dataset.animDuration);
+            const delay = parseFloat(wrapper.dataset.animDelay);
             
-            // Pinning for scrolly block
-            if (type === 'scrolly-image-text') {
-                const imageEl = wrapper.querySelector('.scrolly-img-col');
-                if (imageEl) {
-                    ScrollTrigger.create({
-                        trigger: wrapper,
-                        pin: imageEl,
-                        start: "top top",
-                        end: "bottom bottom"
-                    });
-                }
-            }
-
-            // Entrance Animations
             if (animType === 'none') return;
             
             let fromVars = {
                 opacity: 0,
                 duration: duration,
+                delay: delay,
                 ease: "power2.out",
                 scrollTrigger: {
                     trigger: wrapper,
-                    start: "top 85%",
+                    start: "top 90%",
                     toggleActions: "play none none reverse"
                 }
             };
             
             if (animType === 'slideUp') fromVars.y = 100;
-            if (animType === 'zoomIn') fromVars.scale = 0.8;
+            if (animType === 'slideDown') fromVars.y = -100;
+            if (animType === 'slideLeft') fromVars.x = 100;
+            if (animType === 'slideRight') fromVars.x = -100;
+            if (animType === 'zoomIn') fromVars.scale = 0.5;
+            if (animType === 'zoomOut') fromVars.scale = 1.5;
+            if (animType === 'rotate') { fromVars.rotation = 180; fromVars.scale = 0.5; }
             
-            gsap.from(wrapper.firstElementChild, fromVars);
+            gsap.from(wrapper, fromVars);
         });
     </script>
 </body>
@@ -655,91 +501,47 @@ ${blocksHtml}
     return { html: htmlCode, css: cssCode };
 }
 
-function addBlock(type) {
-    let defaultContent = {};
-    if (type === 'hero') {
-        defaultContent = {
-            title: 'Scrollytelling Masterpiece',
-            subtitle: 'Scroll down to discover the magic.',
-            bgImage: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop'
-        };
-    } else if (type === 'text') {
-        defaultContent = {
-            title: 'The Art of Scrolling',
-            text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.'
-        };
-    } else if (type === 'scrolly-image-text') {
-        defaultContent = {
-            title: 'Immersive Experiences',
-            text: 'This image will pin to the side while you read this text, creating a beautiful scrollytelling effect.',
-            image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop'
-        };
+function addElement(type) {
+    // Determine random start pos based on scroll
+    const startY = dom.canvas.scrollTop + 50;
+    let content = { x: 50, y: startY, zIndex: state.elements.length + 1 };
+
+    if (type === 'text') {
+        content = { ...content, width: 400, height: 100, text: 'Click to edit your freeform text', fontSize: 32, textColor: '#111827', bgColor: 'transparent', align: 'left', isBold: true, isItalic: false };
+    } else if (type === 'image') {
+        content = { ...content, width: 400, height: 300, src: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1000&auto=format&fit=crop', objectFit: 'cover' };
+    } else if (type === 'video') {
+        content = { ...content, width: 400, height: 300, src: 'https://www.w3schools.com/html/mov_bbb.mp4', objectFit: 'cover' };
+    } else if (type === 'youtube') {
+        content = { ...content, width: 560, height: 315, src: 'dQw4w9WgXcQ', objectFit: 'cover' };
     } else if (type === 'button') {
-        defaultContent = {
-            text: 'Click Me',
-            link: '#',
-            shape: 'rounded',
-            color: '#6366f1',
-            textColor: '#ffffff'
-        };
-    } else if (type === 'grid-2') {
-        defaultContent = {
-            image1: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=1000&auto=format&fit=crop',
-            image2: 'https://images.unsplash.com/photo-1682687982501-1e58f813f228?q=80&w=1000&auto=format&fit=crop'
-        };
-    } else if (type === 'grid-4') {
-        defaultContent = {
-            image1: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=800&auto=format&fit=crop',
-            image2: 'https://images.unsplash.com/photo-1682687982501-1e58f813f228?q=80&w=800&auto=format&fit=crop',
-            image3: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=800&auto=format&fit=crop',
-            image4: 'https://images.unsplash.com/photo-1682687982185-531d09ec56fc?q=80&w=800&auto=format&fit=crop'
-        };
-    } else if (type === 'freeform') {
-        defaultContent = {
-            mediaType: 'image', // image, video, youtube
-            src: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1000&auto=format&fit=crop',
-            objectFit: 'cover', // cover for crop, fill for stretch
-            x: 50,
-            y: 50,
-            width: 400,
-            height: 300,
-            zIndex: 10
-        };
+        content = { ...content, width: 200, height: 60, text: 'Click Me', link: '#', shape: 'rounded', color: '#6366f1', textColor: '#ffffff' };
     }
 
-    const newBlock = {
-        id: 'block_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+    const newEl = {
+        id: 'el_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
         type: type,
-        content: defaultContent,
-        animations: {
-            type: 'slideUp',
-            duration: '1.5'
-        }
+        content: content,
+        animations: { type: 'slideUp', duration: '1.0', delay: '0' }
     };
     
-    state.blocks.push(newBlock);
-    selectBlock(newBlock.id);
-    
-    // Scroll to bottom of canvas
-    setTimeout(() => {
-        elements.canvas.scrollTop = elements.canvas.scrollHeight;
-    }, 10);
+    state.elements.push(newEl);
+    selectElement(newEl.id);
 }
 
-function selectBlock(id) {
-    state.selectedBlockId = id;
+function selectElement(id) {
+    state.selectedElementId = id;
     renderCanvas();
     renderProperties();
 }
 
-function deleteBlock(id) {
-    state.blocks = state.blocks.filter(b => b.id !== id);
-    if (state.selectedBlockId === id) {
-        state.selectedBlockId = null;
+function deleteElement(id) {
+    state.elements = state.elements.filter(e => e.id !== id);
+    if (state.selectedElementId === id) {
+        state.selectedElementId = null;
     }
     renderCanvas();
     renderProperties();
 }
 
-// Start the app
 document.addEventListener('DOMContentLoaded', init);
