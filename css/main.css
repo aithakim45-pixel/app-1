@@ -202,6 +202,55 @@ a { color: var(--accent-color); text-decoration: none; }
     color: var(--text-muted);
 }
 
+/* Palette Dropdown */
+.palette-block-wrapper {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.palette-dropdown {
+    position: absolute;
+    top: calc(100% - 5px);
+    left: 0;
+    width: 100%;
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+.palette-block-wrapper:hover .palette-dropdown {
+    display: flex;
+}
+
+.palette-dropdown-btn {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    padding: 10px 15px;
+    text-align: left;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.palette-dropdown-btn:hover {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: var(--accent-color);
+}
+
+/* Grid Specific CSS */
+.grid-element-container {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    gap: 10px;
+}
+
 /* Canvas Container */
 .canvas-container {
     flex: 1;
@@ -287,10 +336,40 @@ a { color: var(--accent-color); text-decoration: none; }
     border-color: rgba(99, 102, 241, 0.5);
 }
 
-.canvas-element.selected {
-    border-color: var(--accent-color);
-    z-index: 9999 !important;
+.canvas-element.active {
+    outline: 2px solid var(--primary-color);
+    z-index: 999 !important;
 }
+
+/* Resize Handles */
+.canvas-element.active::before,
+.canvas-element.active::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    z-index: 1000;
+}
+
+/* Top-Left */
+.canvas-element.active::before {
+    top: -6px;
+    left: -6px;
+    cursor: nw-resize;
+}
+
+/* Bottom-Right */
+.canvas-element.active::after {
+    bottom: -6px;
+    right: -6px;
+    cursor: se-resize;
+}
+
+/* We need extra elements for top-right and bottom-left, but interact.js can just use the edges. 
+   We will add actual DOM elements in JS for the corners so interact.js works perfectly. */
 
 .block-controls {
     position: absolute;
